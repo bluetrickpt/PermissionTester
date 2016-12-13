@@ -1,4 +1,4 @@
-# Permission Tester v1.0
+# Permission Tester v1.1
 
 ## Description
 
@@ -22,6 +22,7 @@ For every package, a message with the following format will be displayed:
 	Denied permissions (Status equals -1): PermissionP2; ...
 
 Example:
+
 	Package com.android.emergency requires: 
 	android.permission.CALL_PHONE (Status: 0; Protection Level: 1; Group: android.permission-group.PHONE)
 	android.permission.READ_CONTACTS (Status: 0; Protection Level: 1; Group: android.permission-group.CONTACTS)
