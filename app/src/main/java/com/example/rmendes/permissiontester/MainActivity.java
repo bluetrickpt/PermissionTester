@@ -1,22 +1,15 @@
 package com.example.rmendes.permissiontester;
 
-import android.Manifest;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PermissionInfo;
-import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
-import android.support.v4.content.PermissionChecker;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.View;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.widget.Button;
 
 import java.util.List;
@@ -25,14 +18,6 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
     private final String TAG = this.getClass().getSimpleName();
 
-
-    //Small test with location only. We could use a String[] with any number of permissions.
-    private static final String[] PERMISSIONS = {Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION};
-    //Note that there are infinite permissions, since developers can create new permissions.
-    //Thus, this list may either be static or ever growing by appending (distinct) packages' permissions as they appear.
-    //One way to get all permissions in a given device does exist, although I haven't tested (see http://stackoverflow.com/a/32063889).
-
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -40,27 +25,17 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        Button getGrantedBtn = (Button) findViewById(R.id.get_granted_btn);
-        getGrantedBtn.setOnClickListener(new View.OnClickListener() {
+        Button getGrantedBtn = (Button) findViewById(R.id.get_log_btn);
+        getGrantedBtn.setOnClickListener(new View.OnClickListener() { //On button click, runs our permission logger (runPermissionLogger())
             @Override
             public void onClick(View view) {
-                runPermissionLogger(PackageManager.PERMISSION_GRANTED);
+                runPermissionLogger();
             }
         });
-
-        Button getDeniedBtn = (Button) findViewById(R.id.get_denied_btn);
-        getDeniedBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                runPermissionLogger(PackageManager.PERMISSION_DENIED);
-            }
-        });
-
     }
 
-    //Logs to console packages with granted/denied permissions from PERMISSIONS.
-    //pemissionStatus may be PackageManager.PERMISSION_GRANTED or PackageManager.PERMISSION_DENIED
-    private void runPermissionLogger(int permissionStatus) {
+    //Logs to console all packages and the respective granted and denied permissions.
+    private void runPermissionLogger() {
 
         final PackageManager pm = getPackageManager();
 
@@ -68,41 +43,43 @@ public class MainActivity extends AppCompatActivity {
         List<ApplicationInfo> installedApplications = pm.getInstalledApplications(PackageManager.GET_META_DATA);
 
         for (ApplicationInfo applicationInfo : installedApplications) { //For each application
-//            Log.d(TAG, "Installed package :" + applicationInfo.packageName);
-//            Log.d(TAG, "Source dir : " + applicationInfo.sourceDir);
-//            Log.d(TAG, "Launch Activity :" + pm.getLaunchIntentForPackage(applicationInfo.packageName));
 
-
-            //List all required (may or may not be accepted yet) permissions for this package
             try {
-                // pm.getLaunchIntentForPackage(applicationInfo.packageName); //gives the intent --> startActivityForResult(Intent, int requestCode)
-
-                PackageInfo packagePermissionsInfo = pm.getPackageInfo(applicationInfo.packageName, PackageManager.GET_PERMISSIONS); //Get this application's package permission info
+                PackageInfo packagePermissionsInfo = pm.getPackageInfo(applicationInfo.packageName, PackageManager.GET_PERMISSIONS); //Get this package's permissions info
 
                 String[] packagePermissions = packagePermissionsInfo.requestedPermissions; //Array of all <uses-permission> tags included under <manifest>, or null if there were none.
+
                 if(packagePermissions != null) { //Some apps have no permission requirements
-                    String allPermissions = new String();
-                    for(String perm : packagePermissions) {
-                        allPermissions += perm + "; ";
+                    Log.d(TAG,"Package " + applicationInfo.packageName + " requires: ");
+
+                    String grantedPermissions = "", deniedPermissions = ""; //A set of all granted (denied) permissions to display as a summary
+
+                    for(String permissionName : packagePermissions) {
+
+                        PermissionInfo permissionInfo = pm.getPermissionInfo(permissionName, 0); //Returns all the information concerning the permission "permissionName"
+                        int protectionLevelFlag = permissionInfo.protectionLevel; // See flags in: https://developer.android.com/reference/android/content/pm/PermissionInfo.html
+                        String group = permissionInfo.group; //The group may be null
+
+                        int permissionStatusFlag = pm.checkPermission(permissionName, applicationInfo.packageName); //Gets if permission is granted or denied
+                        if(permissionStatusFlag == PackageManager.PERMISSION_GRANTED) {
+                            grantedPermissions += permissionName + "; ";
+                        } else { //if it is not granted, it's PERMISSION_DENIED
+                            deniedPermissions += permissionName + "; ";
+                        }
+                        Log.d(TAG, permissionName + " (Status: " + permissionStatusFlag + "; Protection Level: " + protectionLevelFlag + "; Group: " + group + ")");
                     }
-                    Log.d(TAG,"Package " + applicationInfo.packageName + " requires: " + allPermissions);
+
+                    Log.d(TAG," \n"); //for output format
+                    Log.d(TAG, "Summary:");
+                    Log.d(TAG, "Granted permissions (Status equals " + PackageManager.PERMISSION_GRANTED + "): " + grantedPermissions);
+                    Log.d(TAG, "Denied permissions (Status equals " + PackageManager.PERMISSION_DENIED + "): " + deniedPermissions);
+                    Log.d(TAG,"===================================");
                 }
 
             } catch (PackageManager.NameNotFoundException e) {
                 e.printStackTrace();
             }
-
-            //Now check all granted/denied permissions. Note that denied permissions are permissions that were not granted or no user input was yet given.
-            //By default, normal permissions are always granted and dangerous permissions require user input (see protectionLevel in Android API)
-
-            for (String permission : PERMISSIONS) { //Check if our PERMISSIONS were accepted or (not yet accepted or denied)
-                if (pm.checkPermission(permission, applicationInfo.packageName) == permissionStatus) {
-                    String permissionStatusString = (permissionStatus==PackageManager.PERMISSION_GRANTED) ? " has access to " : " is denied to ";
-                    Log.d(TAG,"Package: " + applicationInfo.packageName  + permissionStatusString + permission);
-                }
-            }
         }
-        Log.d(TAG,"===================================");
     }
 
     //We have started by going through each package and check all permissions in a given package.
